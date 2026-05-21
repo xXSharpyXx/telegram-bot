@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>VaultStore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e0e10;--surface:#141416;--surface2:#1a1a1e;--border:#2a2a30;
+  --gold:#d4a853;--gold-dim:#a07c3a;
+  --text:#f0ede8;--muted:#6e6d73;
+  --green:#4caf7d;--red:#e05c5c;
+  --radius:14px;--tab-h:68px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;position:relative}
+
+/* ── SCROLL AREA ── */
+#app{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:calc(var(--tab-h)+8px);scroll-behavior:smooth}
+#app::-webkit-scrollbar{width:0}
+
+/* ── PAGES ── */
+.page{display:none;min-height:100%;padding:16px 16px 8px;animation:fadeUp .22s ease both}
+.page.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── BOTTOM NAV ── */
+#nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;
+  height:var(--tab-h);background:var(--surface);border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-around;z-index:100;padding:0 8px}
+.nav-btn{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;
+  color:var(--muted);font-family:'Syne',sans-serif;font-size:11px;font-weight:600;
+  cursor:pointer;padding:8px 16px;border-radius:12px;transition:color .18s,background .18s;flex:1}
+.nav-btn .icon{font-size:22px}
+.nav-btn.active{color:var(--gold)}
+.nav-btn.active .icon{filter:drop-shadow(0 0 6px var(--gold))}
+
+/* ── COMMON ── */
+h1{font-size:22px;font-weight:800;letter-spacing:-.5px}
+h2{font-size:17px;font-weight:700}
+h3{font-size:14px;font-weight:600}
+.muted{color:var(--muted);font-size:13px}
+.mono{font-family:'DM Mono',monospace}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:13px 20px;border-radius:var(--radius);border:none;cursor:pointer;
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;transition:opacity .15s,transform .1s}
+.btn:active{transform:scale(.97)}
+.btn-gold{background:var(--gold);color:#0e0e10}
+.btn-gold:hover{opacity:.9}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--gold);color:var(--gold)}
+.btn-red{background:var(--red);color:#fff}
+.btn-green{background:var(--green);color:#fff}
+.btn-sm{padding:8px 14px;font-size:12px;border-radius:10px}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.card+.card{margin-top:10px}
+
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.badge-green{background:rgba(76,175,125,.15);color:var(--green)}
+.badge-red{background:rgba(224,92,92,.15);color:var(--red)}
+.badge-gold{background:rgba(212,168,83,.15);color:var(--gold)}
+.badge-muted{background:rgba(110,109,115,.15);color:var(--muted)}
+
+.divider{height:1px;background:var(--border);margin:14px 0}
+
+/* ── BALANCE BANNER ── */
+.balance-banner{background:linear-gradient(135deg,#1a1812 0%,#1e1b10 100%);
+  border:1px solid rgba(212,168,83,.25);border-radius:var(--radius);padding:18px;
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.balance-amount{font-family:'DM Mono',monospace;font-size:26px;font-weight:500;color:var(--gold)}
+.balance-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+
+/* ── CATEGORY GRID ── */
+.cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.cat-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);
+  padding:16px;cursor:pointer;transition:border-color .18s,background .18s;text-align:center}
+.cat-card:hover,.cat-card.active{border-color:var(--gold);background:rgba(212,168,83,.06)}
+.cat-emoji{font-size:30px;margin-bottom:8px}
+.cat-name{font-size:13px;font-weight:700}
+
+/* ── PRODUCT LIST ── */
+.product-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.product-icon{font-size:28px;width:42px;text-align:center;flex-shrink:0}
+.product-info{flex:1;min-width:0}
+.product-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.product-desc{font-size:12px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.product-meta{display:flex;align-items:center;gap:6px;margin-top:5px}
+.product-price{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:var(--gold)}
+.product-weight{font-size:11px;color:var(--muted);background:var(--surface2);
+  padding:2px 7px;border-radius:6px}
+.add-btn{flex-shrink:0;width:36px;height:36px;border-radius:10px;border:none;
+  background:var(--gold);color:#0e0e10;font-size:20px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:opacity .15s}
+.add-btn:active{opacity:.7}
+
+/* ── FLOATING CART ── */
+#cart-fab{position:fixed;bottom:calc(var(--tab-h)+16px);right:16px;z-index:99;
+  background:var(--gold);color:#0e0e10;border:none;border-radius:50px;
+  padding:12px 18px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
+  cursor:pointer;display:none;align-items:center;gap:8px;
+  box-shadow:0 4px 24px rgba(212,168,83,.35);transition:transform .15s}
+#cart-fab:active{transform:scale(.95)}
+#cart-count{background:#0e0e10;color:var(--gold);border-radius:50%;
+  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800}
+
+/* ── MODAL / OVERLAY ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;
+  display:none;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex;animation:fadeIn .18s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.sheet{background:var(--surface);border-radius:20px 20px 0 0;padding:20px;
+  width:100%;max-width:430px;max-height:90vh;overflow-y:auto;
+  animation:slideUp .22s ease both}
+@keyframes slideUp{from{transform:translateY(30px)}to{transform:translateY(0)}}
+.sheet-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+.sheet h2{margin-bottom:14px}
+
+/* ── CART ITEMS ── */
+.cart-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.cart-item:last-child{border-bottom:none}
+.cart-qty{display:flex;align-items:center;gap:8px}
+.qty-btn{width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);
+  background:none;color:var(--text);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
+.qty-num{font-family:'DM Mono',monospace;font-size:14px;min-width:20px;text-align:center}
+
+/* ── CRYPTO SELECT ── */
+.crypto-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0}
+.crypto-btn{border:1.5px solid var(--border);border-radius:12px;padding:10px 6px;
+  background:var(--surface2);cursor:pointer;text-align:center;transition:border-color .15s,background .15s}
+.crypto-btn.selected{border-color:var(--gold);background:rgba(212,168,83,.08)}
+.crypto-code{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--text)}
+.crypto-emoji{font-size:18px;display:block;margin-bottom:3px}
+
+/* ── PAYMENT SCREEN ── */
+.payment-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;text-align:center}
+#qr-container{width:160px;height:160px;margin:12px auto;background:#fff;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+#qr-container canvas,#qr-container img{width:100%!important;height:100%!important}
+.wallet-addr{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);
+  word-break:break-all;background:var(--surface);border:1px solid var(--border);
+  padding:10px;border-radius:10px;margin:8px 0;cursor:pointer;text-align:left;
+  display:flex;align-items:center;justify-content:space-between;gap:8px}
+.copy-icon{flex-shrink:0;font-size:16px}
+.countdown{font-family:'DM Mono',monospace;font-size:16px;color:var(--gold);text-align:center;margin:8px 0}
+
+/* ── WALLET PAGE ── */
+.big-balance{text-align:center;padding:28px 0 20px}
+.big-balance .amount{font-family:'DM Mono',monospace;font-size:42px;font-weight:500;color:var(--gold)}
+.big-balance .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:6px}
+.recharge-amounts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.amount-btn{border:1.5px solid var(--border);border-radius:12px;padding:12px;
+  background:var(--surface2);cursor:pointer;text-align:center;transition:border-color .15s,background .15s;
+  font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:var(--text)}
+.amount-btn:hover,.amount-btn.selected{border-color:var(--gold);color:var(--gold);
+  background:rgba(212,168,83,.06)}
+
+/* ── TRANSACTIONS ── */
+.tx-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.tx-item:last-child{border-bottom:none}
+.tx-icon{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:17px;flex-shrink:0}
+.tx-icon.credit{background:rgba(76,175,125,.15)}
+.tx-icon.debit{background:rgba(224,92,92,.15)}
+.tx-info{flex:1;min-width:0}
+.tx-desc{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-date{font-size:11px;color:var(--muted);margin-top:2px}
+.tx-amount{font-family:'DM Mono',monospace;font-size:14px;font-weight:500}
+.tx-amount.credit{color:var(--green)}
+.tx-amount.debit{color:var(--red)}
+
+/* ── SUPPORT PAGE ── */
+.accordion{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:10px}
+.accordion-header{padding:15px 16px;cursor:pointer;display:flex;align-items:center;
+  justify-content:space-between;font-weight:700;font-size:14px;background:var(--surface);
+  user-select:none;transition:background .15s}
+.accordion-header:hover{background:var(--surface2)}
+.accordion-arrow{transition:transform .2s}
+.accordion-body{padding:0 16px;max-height:0;overflow:hidden;transition:max-height .25s ease,padding .2s}
+.accordion-body.open{max-height:500px;padding:12px 16px 16px}
+.accordion-arrow.open{transform:rotate(180deg)}
+.support-step{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.support-step:last-child{border-bottom:none}
+.step-num{width:26px;height:26px;border-radius:50%;background:var(--gold);color:#0e0e10;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0}
+.step-text{font-size:13px;color:var(--muted);padding-top:3px}
+
+/* ── TOAST ── */
+#toast{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-80px);
+  background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+  padding:10px 18px;font-size:13px;font-weight:600;z-index:9999;
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ── LOADER ── */
+.spinner{width:40px;height:40px;border:3px solid var(--border);
+  border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin:30px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-msg{text-align:center;color:var(--muted);font-size:13px;margin-top:8px}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-icon{font-size:44px;margin-bottom:12px}
+.empty p{font-size:14px}
+
+/* ── SECTION TITLE ── */
+.section-title{font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:1px;color:var(--muted);margin:18px 0 10px}
+
+/* ── BACK BUTTON ── */
+.back-btn{display:flex;align-items:center;gap:6px;background:none;border:none;
+  color:var(--muted);font-family:'Syne',sans-serif;font-size:13px;cursor:pointer;
+  margin-bottom:14px;padding:4px 0}
+.back-btn:hover{color:var(--text)}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ PAGES ═══════════════════════ -->
+<div id="app">
+
+  <!-- ── BOUTIQUE ── -->
+  <div id="page-shop" class="page active">
+    <div class="balance-banner" id="shop-balance-banner">
+      <div>
+        <div class="balance-label">Solde wallet</div>
+        <div class="balance-amount mono" id="shop-balance">— €</div>
+      </div>
+      <div style="font-size:28px">🛍</div>
+    </div>
+
+    <div id="shop-categories">
+      <div class="spinner"></div>
+      <div class="loader-msg">Chargement des catégories…</div>
+    </div>
+
+    <div id="shop-products" style="display:none">
+      <button class="back-btn" onclick="showCategories()">← Retour aux catégories</button>
+      <div id="product-list"></div>
+    </div>
+  </div>
+
+  <!-- ── PORTEFEUILLE ── -->
+  <div id="page-wallet" class="page">
+    <div class="big-balance">
+      <div class="label">Solde disponible</div>
+      <div class="amount mono" id="wallet-balance">— €</div>
+    </div>
+
+    <button class="btn btn-gold" style="width:100%;margin-bottom:20px" onclick="openRechargeSheet()">
+      ⚡ Recharger le wallet
+    </button>
+
+    <div class="section-title">Historique des transactions</div>
+    <div id="tx-list">
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <!-- ── SUPPORT ── -->
+  <div id="page-support" class="page">
+    <div style="margin-bottom:20px">
+      <h1 style="margin-bottom:4px">Support</h1>
+      <div class="muted">Besoin d'aide ? On est là.</div>
+    </div>
+
+    <div class="accordion">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        📖 Guide d'utilisation
+        <span class="accordion-arrow">▼</span>
+      </div>
+      <div class="accordion-body">
+        <div class="support-step">
+          <div class="step-num">1</div>
+          <div class="step-text"><strong>Parcourez la boutique</strong> — Sélectionnez une catégorie et explorez les produits disponibles.</div>
+        </div>
+        <div class="support-step">
+          <div class="step-num">2</div>
+          <div class="step-text"><strong>Ajoutez au panier</strong> — Cliquez sur ＋ à côté du produit souhaité.</div>
+        </div>
+        <div class="support-step">
+          <div class="step-num">3</div>
+          <div class="step-text"><strong>Choisissez votre crypto</strong> — USDT, BTC, ETH, SOL, LTC ou USDC.</div>
+        </div>
+        <div class="support-step">
+          <div class="step-num">4</div>
+          <div class="step-text"><strong>Envoyez le paiement</strong> — Scannez le QR code ou copiez l'adresse. Vous avez 30 minutes.</div>
+        </div>
+        <div class="support-step">
+          <div class="step-num">5</div>
+          <div class="step-text"><strong>Confirmation automatique</strong> — Vous recevrez une notification Telegram dès validation.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        💡 Tutoriels
+        <span class="accordion-arrow">▼</span>
+      </div>
+      <div class="accordion-body">
+        <div class="support-step"><div class="step-num">1</div><div class="step-text"><strong>Recharger son wallet</strong> — Onglet Portefeuille → Recharger → choisissez montant + crypto.</div></div>
+        <div class="support-step"><div class="step-num">2</div><div class="step-text"><strong>Payer avec son solde</strong> — Votre solde wallet est automatiquement utilisé lors du checkout.</div></div>
+        <div class="support-step"><div class="step-num">3</div><div class="step-text"><strong>Suivre une commande</strong> — Consultez l'historique dans l'onglet Portefeuille.</div></div>
+        <div class="support-step"><div class="step-num">4</div><div class="step-text"><strong>Signaler un problème</strong> — Contactez le support via le bouton ci-dessous.</div></div>
+      </div>
+    </div>
+
+    <div class="accordion">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        ✉️ Contact & FAQ
+        <span class="accordion-arrow">▼</span>
+      </div>
+      <div class="accordion-body">
+        <p class="muted" style="font-size:13px;margin-bottom:12px">Questions fréquentes :</p>
+        <div class="support-step"><div class="step-num">?</div><div class="step-text"><strong>Délai de livraison ?</strong> Produits digitaux : instantané. Physiques : 5–7 jours ouvrés.</div></div>
+        <div class="support-step"><div class="step-num">?</div><div class="step-text"><strong>Paiement non détecté ?</strong> Patientez 10 min. Si le problème persiste, contactez le support.</div></div>
+        <div class="support-step"><div class="step-num">?</div><div class="step-text"><strong>Remboursement ?</strong> Contactez le support dans les 48h suivant l'achat.</div></div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px">
+      <button class="btn btn-gold" style="width:100%" onclick="openSupport()">
+        💬 Contacter le support
+      </button>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ═══════════════════════ BOTTOM NAV ═══════════════════════ -->
+<nav id="nav">
+  <button class="nav-btn" onclick="switchPage('wallet')" id="nav-wallet">
+    <span class="icon">💼</span>Portefeuille
+  </button>
+  <button class="nav-btn active" onclick="switchPage('shop')" id="nav-shop">
+    <span class="icon">🛍</span>Boutique
+  </button>
+  <button class="nav-btn" onclick="switchPage('support')" id="nav-support">
+    <span class="icon">💬</span>Support
+  </button>
+</nav>
+
+<!-- ── CART FAB ── -->
+<button id="cart-fab" onclick="openCartSheet()">
+  🛒 <span id="cart-label">Panier</span>
+  <span id="cart-count">0</span>
+</button>
+
+<!-- ═══════════════════════ OVERLAYS ═══════════════════════ -->
+
+<!-- Cart Sheet -->
+<div class="overlay" id="overlay-cart" onclick="closeOverlay('overlay-cart')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <h2>🛒 Mon Panier</h2>
+    <div id="cart-items-list"></div>
+    <div class="divider"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:14px;color:var(--muted)">Total</span>
+      <span class="mono" id="cart-total" style="font-size:20px;color:var(--gold)">0.00 €</span>
+    </div>
+    <div class="section-title">Choisissez votre crypto</div>
+    <div class="crypto-grid" id="crypto-select">
+      <div class="crypto-btn selected" data-code="USDT" onclick="selectCrypto(this)"><span class="crypto-emoji">💵</span><span class="crypto-code">USDT</span></div>
+      <div class="crypto-btn" data-code="BTC"  onclick="selectCrypto(this)"><span class="crypto-emoji">₿</span><span class="crypto-code">BTC</span></div>
+      <div class="crypto-btn" data-code="ETH"  onclick="selectCrypto(this)"><span class="crypto-emoji">⟠</span><span class="crypto-code">ETH</span></div>
+      <div class="crypto-btn" data-code="SOL"  onclick="selectCrypto(this)"><span class="crypto-emoji">◎</span><span class="crypto-code">SOL</span></div>
+      <div class="crypto-btn" data-code="LTC"  onclick="selectCrypto(this)"><span class="crypto-emoji">Ł</span><span class="crypto-code">LTC</span></div>
+      <div class="crypto-btn" data-code="USDC" onclick="selectCrypto(this)"><span class="crypto-emoji">🔵</span><span class="crypto-code">USDC</span></div>
+    </div>
+    <button class="btn btn-gold" style="width:100%;margin-top:14px" onclick="submitOrder()">
+      💳 Payer maintenant
+    </button>
+  </div>
+</div>
+
+<!-- Payment Sheet -->
+<div class="overlay" id="overlay-payment">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <h2 style="margin-bottom:4px">Paiement en attente</h2>
+    <p class="muted" style="font-size:13px;margin-bottom:14px">Envoyez exactement le montant indiqué à l'adresse ci-dessous.</p>
+    <div class="payment-card">
+      <div class="muted" style="font-size:12px">Montant à envoyer</div>
+      <div class="mono" id="pay-amount" style="font-size:22px;color:var(--gold);margin:4px 0">— —</div>
+      <div id="qr-container"><div class="spinner" style="width:28px;height:28px;margin:0"></div></div>
+      <div class="wallet-addr" onclick="copyAddress()" id="pay-address-box">
+        <span id="pay-address" style="word-break:break-all">—</span>
+        <span class="copy-icon">📋</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:12px 0">
+      <span class="muted" style="font-size:13px">Expire dans</span>
+      <span class="countdown" id="countdown">30:00</span>
+    </div>
+    <div id="payment-status-msg" style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:12px">
+      ⏳ En attente de paiement…
+    </div>
+    <button class="btn btn-outline" style="width:100%" onclick="closeOverlay('overlay-payment');clearPaymentPolling()">
+      Fermer
+    </button>
+  </div>
+</div>
+
+<!-- Recharge Sheet -->
+<div class="overlay" id="overlay-recharge" onclick="closeOverlay('overlay-recharge')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <h2>⚡ Recharger le wallet</h2>
+    <p class="muted" style="font-size:13px;margin:8px 0 14px">Choisissez le montant à créditer sur votre wallet.</p>
+    <div class="recharge-amounts" id="recharge-amounts">
+      <div class="amount-btn" data-amount="10" onclick="selectRechargeAmount(this)">10 €</div>
+      <div class="amount-btn" data-amount="25" onclick="selectRechargeAmount(this)">25 €</div>
+      <div class="amount-btn selected" data-amount="50" onclick="selectRechargeAmount(this)">50 €</div>
+      <div class="amount-btn" data-amount="100" onclick="selectRechargeAmount(this)">100 €</div>
+    </div>
+    <div class="section-title">Choisissez votre crypto</div>
+    <div class="crypto-grid" id="recharge-crypto-select">
+      <div class="crypto-btn selected" data-code="USDT" onclick="selectRechargeCrypto(this)"><span class="crypto-emoji">💵</span><span class="crypto-code">USDT</span></div>
+      <div class="crypto-btn" data-code="BTC"  onclick="selectRechargeCrypto(this)"><span class="crypto-emoji">₿</span><span class="crypto-code">BTC</span></div>
+      <div class="crypto-btn" data-code="ETH"  onclick="selectRechargeCrypto(this)"><span class="crypto-emoji">⟠</span><span class="crypto-code">ETH</span></div>
+      <div class="crypto-btn" data-code="SOL"  onclick="selectRechargeCrypto(this)"><span class="crypto-emoji">◎</span><span class="crypto-code">SOL</span></div>
+      <div class="crypto-btn" data-code="LTC"  onclick="selectRechargeCrypto(this)"><span class="crypto-emoji">Ł</span><span class="crypto-code">LTC</span></div>
+      <div class="crypto-btn" data-code="USDC" onclick="selectRechargeCrypto(this)"><span class="crypto-emoji">🔵</span><span class="crypto-code">USDC</span></div>
+    </div>
+    <button class="btn btn-gold" style="width:100%;margin-top:14px" onclick="submitRecharge()">
+      ⚡ Recharger
+    </button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ═══════════════════════ JAVASCRIPT ═══════════════════════ -->
+<script>
+// ─── Telegram WebApp ─────────────────────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+const userId = tg?.initDataUnsafe?.user?.id || 'TEST_USER_123';
+const API = '';  // same origin
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let cart = {};          // { product_id: { product, qty } }
+let selectedCrypto = 'USDT';
+let selectedRechargeCrypto = 'USDT';
+let selectedRechargeAmount = 50;
+let pollingInterval = null;
+let countdownInterval = null;
+let currentOrderId = null;
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
+function fmt(n) { return Number(n).toFixed(2) + ' €'; }
+
+function showToast(msg, duration = 2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+function openOverlay(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeOverlay(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'wallet') loadWallet();
+}
+
+// ─── Balance ──────────────────────────────────────────────────────────────────
+async function loadBalance() {
+  try {
+    const r = await fetch(`${API}/api/user/${userId}`);
+    if (!r.ok) return;
+    const u = await r.json();
+    const b = fmt(u.wallet_balance);
+    document.getElementById('shop-balance').textContent = b;
+    document.getElementById('wallet-balance').textContent = b;
+  } catch (_) {}
+}
+
+// ─── SHOP ─────────────────────────────────────────────────────────────────────
+async function loadCategories() {
+  const el = document.getElementById('shop-categories');
+  try {
+    const r = await fetch(`${API}/api/categories`);
+    const cats = await r.json();
+    if (!cats.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Aucune catégorie disponible.</p></div>'; return; }
+    el.innerHTML = '<div class="cat-grid">' + cats.map(c =>
+      `<div class="cat-card" onclick="loadProducts(${c.id},'${c.name}','${c.emoji||''}')">
+        <div class="cat-emoji">${c.emoji||'📦'}</div>
+        <div class="cat-name">${c.name}</div>
+      </div>`
+    ).join('') + '</div>';
+  } catch (e) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Erreur de chargement.</p></div>';
+  }
+}
+
+async function loadProducts(catId, catName, catEmoji) {
+  document.getElementById('shop-categories').style.display = 'none';
+  const pEl = document.getElementById('shop-products');
+  const listEl = document.getElementById('product-list');
+  pEl.style.display = 'block';
+  listEl.innerHTML = '<div class="spinner"></div>';
+  try {
+    const r = await fetch(`${API}/api/products/${catId}`);
+    const prods = await r.json();
+    if (!prods.length) {
+      listEl.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Aucun produit dans cette catégorie.</p></div>';
+      return;
+    }
+    const title = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <span style="font-size:24px">${catEmoji}</span>
+      <h2>${catName}</h2>
+    </div>`;
+    listEl.innerHTML = title + prods.map(p => `
+      <div class="product-item">
+        <div class="product-icon">${p.is_digital ? '💾' : '📦'}</div>
+        <div class="product-info">
+          <div class="product-name">${p.name}</div>
+          <div class="product-desc">${p.description||''}</div>
+          <div class="product-meta">
+            <span class="product-price">${fmt(p.price)}</span>
+            <span class="product-weight">${p.weight||''}</span>
+          </div>
+        </div>
+        <button class="add-btn" onclick="addToCart(${p.id},'${p.name.replace(/'/g,"\\'")}',${p.price})">＋</button>
+      </div>`).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Erreur de chargement.</p></div>';
+  }
+}
+
+function showCategories() {
+  document.getElementById('shop-products').style.display = 'none';
+  document.getElementById('shop-categories').style.display = 'block';
+}
+
+// ─── CART ─────────────────────────────────────────────────────────────────────
+function addToCart(id, name, price) {
+  if (cart[id]) {
+    cart[id].qty++;
+  } else {
+    cart[id] = { product: { id, name, price }, qty: 1 };
+  }
+  updateCartUI();
+  showToast(`✅ ${name} ajouté`);
+}
+
+function updateCartUI() {
+  const count = Object.values(cart).reduce((s, i) => s + i.qty, 0);
+  const fab = document.getElementById('cart-fab');
+  document.getElementById('cart-count').textContent = count;
+  document.getElementById('cart-label').textContent = 'Panier';
+  fab.style.display = count > 0 ? 'flex' : 'none';
+}
+
+function cartTotal() {
+  return Object.values(cart).reduce((s, i) => s + i.product.price * i.qty, 0);
+}
+
+function openCartSheet() {
+  renderCartItems();
+  document.getElementById('cart-total').textContent = fmt(cartTotal());
+  openOverlay('overlay-cart');
+}
+
+function renderCartItems() {
+  const el = document.getElementById('cart-items-list');
+  const items = Object.values(cart);
+  if (!items.length) {
+    el.innerHTML = '<div class="empty" style="padding:20px 0"><div class="empty-icon">🛒</div><p>Panier vide</p></div>';
+    return;
+  }
+  el.innerHTML = items.map(item => `
+    <div class="cart-item">
+      <div style="flex:1;font-size:13px;font-weight:600">${item.product.name}</div>
+      <div class="cart-qty">
+        <button class="qty-btn" onclick="changeQty(${item.product.id},-1)">−</button>
+        <span class="qty-num">${item.qty}</span>
+        <button class="qty-btn" onclick="changeQty(${item.product.id},1)">＋</button>
+      </div>
+      <div class="mono" style="font-size:13px;color:var(--gold);min-width:60px;text-align:right">
+        ${fmt(item.product.price * item.qty)}
+      </div>
+    </div>`).join('');
+}
+
+function changeQty(id, delta) {
+  if (!cart[id]) return;
+  cart[id].qty += delta;
+  if (cart[id].qty <= 0) delete cart[id];
+  renderCartItems();
+  document.getElementById('cart-total').textContent = fmt(cartTotal());
+  updateCartUI();
+}
+
+function selectCrypto(el) {
+  document.querySelectorAll('#crypto-select .crypto-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedCrypto = el.dataset.code;
+}
+
+async function submitOrder() {
+  const items = Object.values(cart);
+  if (!items.length) return showToast('Votre panier est vide');
+  const payload = {
+    telegram_id: userId,
+    items: items.map(i => ({ product_id: i.product.id, quantity: i.qty })),
+    crypto: selectedCrypto,
+    order_type: 'purchase',
+  };
+  closeOverlay('overlay-cart');
+  await initiatePayment(payload);
+}
+
+// ─── PAYMENT ──────────────────────────────────────────────────────────────────
+async function initiatePayment(payload) {
+  openOverlay('overlay-payment');
+  document.getElementById('pay-amount').textContent = '…';
+  document.getElementById('pay-address').textContent = '…';
+  document.getElementById('payment-status-msg').textContent = '⏳ Création du paiement…';
+  document.getElementById('qr-container').innerHTML = '<div class="spinner" style="width:28px;height:28px;margin:0"></div>';
+
+  try {
+    const r = await fetch(`${API}/api/order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      document.getElementById('payment-status-msg').textContent = '❌ ' + (data.error || 'Erreur');
+      return;
+    }
+    currentOrderId = data.order_id;
+    document.getElementById('pay-amount').textContent = `${data.amount_crypto} ${data.crypto}`;
+    document.getElementById('pay-address').textContent = data.wallet_address;
+    generateQR(data.wallet_address);
+    startCountdown(30 * 60);
+    startPolling(data.order_id);
+    if (payload.order_type !== 'recharge') cart = {};
+    updateCartUI();
+  } catch (e) {
+    document.getElementById('payment-status-msg').textContent = '❌ Erreur réseau';
+  }
+}
+
+function generateQR(address) {
+  const container = document.getElementById('qr-container');
+  container.innerHTML = '';
+  try {
+    new QRCode(container, {
+      text: address,
+      width: 160, height: 160,
+      colorDark: '#000000', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  } catch (e) {
+    container.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px">QR non disponible</div>';
+  }
+}
+
+function copyAddress() {
+  const addr = document.getElementById('pay-address').textContent;
+  if (addr && addr !== '—') {
+    navigator.clipboard.writeText(addr).then(() => showToast('📋 Adresse copiée !'));
+  }
+}
+
+function startCountdown(seconds) {
+  clearInterval(countdownInterval);
+  let remaining = seconds;
+  const el = document.getElementById('countdown');
+  countdownInterval = setInterval(() => {
+    if (remaining <= 0) { clearInterval(countdownInterval); el.textContent = '00:00'; return; }
+    const m = String(Math.floor(remaining / 60)).padStart(2, '0');
+    const s = String(remaining % 60).padStart(2, '0');
+    el.textContent = `${m}:${s}`;
+    remaining--;
+  }, 1000);
+}
+
+function startPolling(orderId) {
+  clearInterval(pollingInterval);
+  pollingInterval = setInterval(async () => {
+    try {
+      const r = await fetch(`${API}/api/order/${orderId}`);
+      if (!r.ok) return;
+      const order = await r.json();
+      const msgEl = document.getElementById('payment-status-msg');
+      if (order.status === 'paid') {
+        msgEl.innerHTML = '<span style="color:var(--green);font-size:15px;font-weight:700">✅ Paiement confirmé !</span>';
+        clearInterval(pollingInterval);
+        clearInterval(countdownInterval);
+        loadBalance();
+        loadWallet();
+        setTimeout(() => closeOverlay('overlay-payment'), 3000);
+      } else if (order.status === 'failed') {
+        msgEl.innerHTML = '<span style="color:var(--red)">❌ Paiement échoué ou expiré.</span>';
+        clearInterval(pollingInterval);
+      }
+    } catch (_) {}
+  }, 10000);
+}
+
+function clearPaymentPolling() {
+  clearInterval(pollingInterval);
+  clearInterval(countdownInterval);
+}
+
+// ─── WALLET ───────────────────────────────────────────────────────────────────
+async function loadWallet() {
+  loadBalance();
+  loadTransactions();
+}
+
+async function loadTransactions() {
+  const el = document.getElementById('tx-list');
+  try {
+    const r = await fetch(`${API}/api/transactions/${userId}`);
+    const txs = await r.json();
+    if (!txs.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>Aucune transaction</p></div>';
+      return;
+    }
+    el.innerHTML = txs.map(tx => {
+      const isCredit = tx.type === 'credit';
+      const d = new Date(tx.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'2-digit' });
+      return `<div class="tx-item">
+        <div class="tx-icon ${tx.type}">${isCredit ? '⬆️' : '⬇️'}</div>
+        <div class="tx-info">
+          <div class="tx-desc">${tx.description || tx.type}</div>
+          <div class="tx-date">${d}</div>
+        </div>
+        <div class="tx-amount ${tx.type}">${isCredit ? '+' : '−'}${fmt(tx.amount_eur)}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>Erreur de chargement</p></div>';
+  }
+}
+
+function openRechargeSheet() {
+  openOverlay('overlay-recharge');
+}
+
+function selectRechargeAmount(el) {
+  document.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedRechargeAmount = parseFloat(el.dataset.amount);
+}
+
+function selectRechargeCrypto(el) {
+  document.querySelectorAll('#recharge-crypto-select .crypto-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedRechargeCrypto = el.dataset.code;
+}
+
+async function submitRecharge() {
+  closeOverlay('overlay-recharge');
+  await initiatePayment({
+    telegram_id: userId,
+    items: [{ amount: selectedRechargeAmount }],
+    crypto: selectedRechargeCrypto,
+    order_type: 'recharge',
+  });
+}
+
+// ─── SUPPORT ─────────────────────────────────────────────────────────────────
+function toggleAccordion(header) {
+  const body = header.nextElementSibling;
+  const arrow = header.querySelector('.accordion-arrow');
+  body.classList.toggle('open');
+  arrow.classList.toggle('open');
+}
+
+function openSupport() {
+  window.open('https://t.me/MON_SUPPORT', '_blank');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadCategories();
+loadBalance();
+</script>
+</body>
+</html>
